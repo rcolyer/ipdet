@@ -96,31 +96,47 @@ except Exception:
 
 if hostname is not None:
   # e.g. convert a.b.c.foo.co.uk to foo.co.uk
+  hrdap = None
   while hostname.count('.') > 2:
     hostname = hostname[hostname.index('.')+1:]
   while True:
     try:
-      hrdap = whoisit.domain(hostname)
+      try:
+        hrdap = whoisit.domain(hostname)
+        raw = False
+      except whoisit.errors.QueryError:
+        # Desperate fallback to raw mode.
+        hrdap = whoisit.domain(hostname, raw=True)
+        raw = True
       break
-    except Exception:
+    except Exception as e:
       # Pop off the left bit and try again as foo.com
       if hostname.count('.') > 1:
         hostname = hostname[hostname.index('.')+1:]
       else:
         break
 
-  try:
-    d.update({'registrar': hrdap['entities']['registrar'][0]['name']})
-  except Exception:
-    pass
-  try:
-    d.update({'domain_abuse': hrdap['entities']['abuse'][0]['email']})
-  except Exception:
-    pass
-  try:
-    d.update({'nameservers': ', '.join(hrdap['nameservers'])})
-  except Exception:
-    pass
+  if hrdap is not None:
+    try:
+      d.update({'registrar':
+        [v[-1] for e in hrdap['entities'] if 'registrar' in e['roles']
+          for v in e['vcardArray'][1] if v[0] == 'fn'][0] if raw else
+        hrdap['entities']['registrar'][0]['name']})
+    except Exception:
+      pass
+    try:
+      d.update({'domain_abuse':
+        [a[-1] for e in [e['entities'] for e in hrdap['entities'] if 'entities' in e][0]
+          for a in e['vcardArray'][1] if a[0] in ['email']][0] if raw else
+        hrdap['entities']['abuse'][0]['email']})
+    except Exception:
+      pass
+    try:
+      d.update({'nameservers':
+        ', '.join([e['ldhName'] for e in hrdap['nameservers']]) if raw else
+        ', '.join(hrdap['nameservers'])})
+    except Exception:
+      pass
 
 # Filter out empty-string results.
 d = {k:v for k,v in d.items() if v}
