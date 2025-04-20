@@ -86,6 +86,10 @@ try:
 except Exception:
   pass
 try:
+  d.update({'net_name': rdap['name']})
+except Exception:
+  pass
+try:
   d.update({'network': str(rdap['network'])})
 except Exception:
   pass

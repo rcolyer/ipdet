@@ -44,6 +44,7 @@ timezone:       America/New_York
 ip_registrant:  Amazon Technologies Inc.
 ip_abuse:       https://rdap.arin.net/registry/entity/AEA8-ARIN
 net_handle:     NET-3-0-0-0-1
+net_name:       AT-88-Z
 network:        3.0.0.0/9
 ```
 
@@ -59,6 +60,7 @@ timezone:       America/New_York
 ip_registrant:  Fastly, Inc.
 ip_abuse:       https://rdap.arin.net/registry/entity/ABUSE4771-ARIN
 net_handle:     NET-151-101-0-0-1
+net_name:       SKYCA-3
 network:        151.101.0.0/16
 registrar:      British Broadcasting Corporation
 domain_abuse:   nominet.admins@bbc.co.uk
