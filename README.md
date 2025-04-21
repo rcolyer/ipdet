@@ -13,6 +13,12 @@ Note that not all categories of information are available for all ip addresses
 or hostnames.  ipdet will fail gracefully, and include the available
 information in its report.
 
+For developers interested in diagnosing missing or incorrect results, command
+line options `--debug` (brief) and `--stacktraces` (comprehensive, and
+including the erroring data) will provide diagnostics about what went wrong and
+where.  Option `--rawdata` will include a pretty-printed report of all raw
+data obtained, whether errors occurred or not.
+
 
 # Installing
 
