@@ -165,7 +165,8 @@ if hostname is not None:
         raw = False
       except whoisit.errors.ResourceDoesNotExist as e:
         raise
-      except whoisit.errors.QueryError as e:
+      # UnboundLocalError too due to typo in latest whoisit, 3.0.4, issue #42
+      except (whoisit.errors.QueryError, UnboundLocalError) as e:
         DebPrint(e, inspect.currentframe().f_lineno, hostname)
         # Desperate fallback to raw mode.
         hrdap = whoisit.domain(hostname, raw=True)
