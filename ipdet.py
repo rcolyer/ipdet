@@ -57,6 +57,10 @@ def DebPrint(e, linenum, info='', rawdata=None):
           globals()['rawdata_list'].append(rawdata)
     globals()['error_cnt'] += 1
 
+if len(sys.argv) > 2:
+  argv_extra = ' '.join(sys.argv[2:])
+  argv_s = 's' if len(sys.argv)>3 else ''
+  print(f'Unprocessed command-line argument{argv_s}:  {argv_extra}\n')
 ipaddr = sys.argv[1]
 hostname = None
 
