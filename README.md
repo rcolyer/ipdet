@@ -11,7 +11,9 @@ information useful for identification of an ip address or hostname.
 
 Note that not all categories of information are available for all ip addresses
 or hostnames.  ipdet will fail gracefully, and include the available
-information in its report.
+information in its report.  To skip slow remote lookups and only query local
+database information for geographic information, the symlink `geoinfo` to
+`ipdet.py` can be used, or `ipdet` can be run with the `--geo` option.
 
 For developers interested in diagnosing missing or incorrect results, command
 line options `--debug` (brief) and `--stacktraces` (comprehensive, and

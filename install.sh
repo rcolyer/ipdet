@@ -1,7 +1,9 @@
 #!/bin/bash
 
 ENV="$1"
-TARGET=~/bin/ipdet
+DESTDIR=~/bin
+TARGET="$DESTDIR/ipdet"
+GEOTARGET="$DESTDIR/geoinfo"
 
 if [ "$ENV" == "--help" ]
 then
@@ -41,6 +43,7 @@ then
   then
     mkdir ~/bin 2>/dev/null
     ln -s "$SCRIPTDIR"/ipdet.py "$TARGET"
+    ln -s "$SCRIPTDIR"/ipdet.py "$GEOTARGET"
   fi
 
   runvenv -w .venv ipdet.py >/dev/null ||

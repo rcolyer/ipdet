@@ -5,7 +5,6 @@
 #
 
 import maxminddb
-import whoisit
 import inspect
 import pprint
 import sys
@@ -14,16 +13,27 @@ import os
 script_dir = os.path.dirname(os.path.realpath(__file__))
 db = maxminddb.open_database(os.path.join(script_dir, 'GeoLite2-City.mmdb'))
 
+run_as_geo = os.path.splitext(os.path.basename(sys.argv[0]))[0] == 'geoinfo'
 debmodes = ['--debug', '--stacktraces']
-if len(sys.argv) < 2 or '--help' in sys.argv[1:]:
-  print(sys.argv[0], '<ip_address>')
-  print(sys.argv[0], '<hostname>')
+if len(sys.argv) < 2 or '--help' in sys.argv[1:] or \
+    all(s.startswith('-') for s in sys.argv[1:]):
+  print('Run as:' if run_as_geo else 'Full information with remote lookup:')
+  print(f'  {sys.argv[0]} <ip_address>')
+  print(f'  {sys.argv[0]} <hostname>')
+  if not run_as_geo:
+    print('Geographic data via local database query only:')
+    print(f'  geoinfo <ip_address>')
+    print(f'  geoinfo <hostname>')
+    print('  Or use option: --geo')
+
   print('Debugging options: ' + ', '.join(debmodes + ['--rawdata']))
   sys.exit(0 if '--help' in sys.argv[1:] else -1)
 
 debug = False
 stacktraces = False
 show_raw_data = False
+do_remote = True
+
 
 def ArgsPop(s):
   if s in sys.argv[1:]:
@@ -43,6 +53,11 @@ if any(dm in sys.argv[1:] for dm in debmodes):
     rawdata_list = []
   for dm in debmodes:
     ArgsPop(dm)
+
+if '--geo' in sys.argv[1:] or run_as_geo:
+  ArgsPop('--geo')
+  do_remote = False
+
 
 def DebPrint(e, linenum, info='', rawdata=None):
   if debug:
@@ -118,92 +133,95 @@ except Exception as e:
   DebPrint(e, inspect.currentframe().f_lineno, 'timezone', geo)
 
 rdap = None
-try:
-  whoisit.bootstrap()
-  rdap = whoisit.ip(ipaddr)
-except Exception as e:
-  DebPrint(e, inspect.currentframe().f_lineno, 'whoisit')
+hrdap = None
 
-if rdap is not None:
+if do_remote:
+  import whoisit
   try:
-    d.update({'ip_registrant': rdap['entities']['registrant'][0]['name']})
+    whoisit.bootstrap()
+    rdap = whoisit.ip(ipaddr)
   except Exception as e:
-    DebPrint(e, inspect.currentframe().f_lineno, 'ip_registrant', rdap)
-  try:
-    d.update({'ip_abuse': rdap['entities']['abuse'][0]['url']})
-  except Exception as e:
-    DebPrint(e, inspect.currentframe().f_lineno, 'ip_abuse', rdap)
+    DebPrint(e, inspect.currentframe().f_lineno, 'whoisit')
+
+  if rdap is not None:
     try:
-      d.update({'ip_abuse': rdap['entities']['abuse'][0]['email']})
+      d.update({'ip_registrant': rdap['entities']['registrant'][0]['name']})
+    except Exception as e:
+      DebPrint(e, inspect.currentframe().f_lineno, 'ip_registrant', rdap)
+    try:
+      d.update({'ip_abuse': rdap['entities']['abuse'][0]['url']})
     except Exception as e:
       DebPrint(e, inspect.currentframe().f_lineno, 'ip_abuse', rdap)
-  try:
-    d.update({'net_handle': rdap['handle']})
-  except Exception as e:
-    DebPrint(e, inspect.currentframe().f_lineno, 'net_handle', rdap)
-  try:
-    d.update({'net_name': rdap['name']})
-  except Exception as e:
-    DebPrint(e, inspect.currentframe().f_lineno, 'net_name', rdap)
-  try:
-    d.update({'network': str(rdap['network'])})
-  except Exception as e:
-    DebPrint(e, inspect.currentframe().f_lineno, 'network', rdap)
-
-hrdap = None
-if hostname is not None:
-  # e.g. convert a.b.c.foo.co.uk to foo.co.uk
-  pass_errors = 0
-  while hostname.count('.') > 2:
-    hostname = hostname[hostname.index('.')+1:]
-  while True:
-    try:
       try:
-        hrdap = whoisit.domain(hostname)
-        if debug and pass_errors>0:
-          print(f'Line_{inspect.currentframe().f_lineno}: But succeeded with {hostname}')
-        raw = False
-      except whoisit.errors.ResourceDoesNotExist as e:
-        raise
-      # UnboundLocalError too due to typo in latest whoisit, 3.0.4, issue #42
-      except (whoisit.errors.QueryError, UnboundLocalError) as e:
-        DebPrint(e, inspect.currentframe().f_lineno, hostname)
-        # Desperate fallback to raw mode.
-        hrdap = whoisit.domain(hostname, raw=True)
-        if debug:
-          print(f'Line_{inspect.currentframe().f_lineno}: But switched to raw mode with {hostname}')
-        raw = True
-      break
+        d.update({'ip_abuse': rdap['entities']['abuse'][0]['email']})
+      except Exception as e:
+        DebPrint(e, inspect.currentframe().f_lineno, 'ip_abuse', rdap)
+    try:
+      d.update({'net_handle': rdap['handle']})
     except Exception as e:
-      DebPrint(e, inspect.currentframe().f_lineno, hostname)
-      pass_errors += 1
-      # Pop off the left bit and try again as foo.com
-      if hostname.count('.') > 1:
-        hostname = hostname[hostname.index('.')+1:]
-      else:
-        break
+      DebPrint(e, inspect.currentframe().f_lineno, 'net_handle', rdap)
+    try:
+      d.update({'net_name': rdap['name']})
+    except Exception as e:
+      DebPrint(e, inspect.currentframe().f_lineno, 'net_name', rdap)
+    try:
+      d.update({'network': str(rdap['network'])})
+    except Exception as e:
+      DebPrint(e, inspect.currentframe().f_lineno, 'network', rdap)
 
-  if hrdap is not None:
-    try:
-      d.update({'registrar':
-        [v[-1] for e in hrdap['entities'] if 'registrar' in e['roles']
-          for v in e['vcardArray'][1] if v[0] == 'fn'][0] if raw else
-        hrdap['entities']['registrar'][0]['name']})
-    except Exception as e:
-      DebPrint(e, inspect.currentframe().f_lineno, f'registrar, raw={raw}', hrdap)
-    try:
-      d.update({'domain_abuse':
-        [a[-1] for e in [e['entities'] for e in hrdap['entities'] if 'entities' in e][0]
-          for a in e['vcardArray'][1] if a[0] in ['email']][0] if raw else
-        hrdap['entities']['abuse'][0]['email']})
-    except Exception as e:
-      DebPrint(e, inspect.currentframe().f_lineno, f'domain_abuse, raw={raw}', hrdap)
-    try:
-      d.update({'nameservers':
-        ', '.join([e['ldhName'] for e in hrdap['nameservers']]) if raw else
-        ', '.join(hrdap['nameservers'])})
-    except Exception as e:
-      DebPrint(e, inspect.currentframe().f_lineno, f'nameservers, raw={raw}', hrdap)
+  if hostname is not None:
+    # e.g. convert a.b.c.foo.co.uk to foo.co.uk
+    pass_errors = 0
+    while hostname.count('.') > 2:
+      hostname = hostname[hostname.index('.')+1:]
+    while True:
+      try:
+        try:
+          hrdap = whoisit.domain(hostname)
+          if debug and pass_errors>0:
+            print(f'Line_{inspect.currentframe().f_lineno}: But succeeded with {hostname}')
+          raw = False
+        except whoisit.errors.ResourceDoesNotExist as e:
+          raise
+        # UnboundLocalError too due to typo in latest whoisit, 3.0.4, issue #42
+        except (whoisit.errors.QueryError, UnboundLocalError) as e:
+          DebPrint(e, inspect.currentframe().f_lineno, hostname)
+          # Desperate fallback to raw mode.
+          hrdap = whoisit.domain(hostname, raw=True)
+          if debug:
+            print(f'Line_{inspect.currentframe().f_lineno}: But switched to raw mode with {hostname}')
+          raw = True
+        break
+      except Exception as e:
+        DebPrint(e, inspect.currentframe().f_lineno, hostname)
+        pass_errors += 1
+        # Pop off the left bit and try again as foo.com
+        if hostname.count('.') > 1:
+          hostname = hostname[hostname.index('.')+1:]
+        else:
+          break
+
+    if hrdap is not None:
+      try:
+        d.update({'registrar':
+          [v[-1] for e in hrdap['entities'] if 'registrar' in e['roles']
+            for v in e['vcardArray'][1] if v[0] == 'fn'][0] if raw else
+          hrdap['entities']['registrar'][0]['name']})
+      except Exception as e:
+        DebPrint(e, inspect.currentframe().f_lineno, f'registrar, raw={raw}', hrdap)
+      try:
+        d.update({'domain_abuse':
+          [a[-1] for e in [e['entities'] for e in hrdap['entities'] if 'entities' in e][0]
+            for a in e['vcardArray'][1] if a[0] in ['email']][0] if raw else
+          hrdap['entities']['abuse'][0]['email']})
+      except Exception as e:
+        DebPrint(e, inspect.currentframe().f_lineno, f'domain_abuse, raw={raw}', hrdap)
+      try:
+        d.update({'nameservers':
+          ', '.join([e['ldhName'] for e in hrdap['nameservers']]) if raw else
+          ', '.join(hrdap['nameservers'])})
+      except Exception as e:
+        DebPrint(e, inspect.currentframe().f_lineno, f'nameservers, raw={raw}', hrdap)
 
 # Filter out empty-string results.
 d = {k:v for k,v in d.items() if v}
