@@ -87,7 +87,17 @@ except ValueError:
   try:
     # Fall back to treating it like a hostname.
     hostname = ipaddr
-    ipaddr = socket.gethostbyname(hostname)
+    res = socket.getaddrinfo(hostname, None)
+    extract = {addr:(4 if stype == socket.AF_INET else 6)
+        for stype,_,_,_,(addr,*_) in res}
+    iplist = {4:[k for k,v in extract.items() if v==4],
+              6:[k for k,v in extract.items() if v==6]}
+    if iplist[4]:
+      ipaddr = iplist[4][0]
+    elif iplist[6]:
+      ipaddr = iplist[6][0]
+    else:
+      raise ValueError('getaddrinfo succeeded but no addresses found')
   except Exception as e:
     DebPrint(e, inspect.currentframe().f_lineno, hostname)
     print('Not an ip address, and could not resolve as a hostname.')
